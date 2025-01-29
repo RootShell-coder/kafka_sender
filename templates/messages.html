@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Kafka Messages</title>
+    <style>
+      :root {
+        --bg-color: #1a1a1a;
+        --container-bg: #2d2d2d;
+        --text-color: #e0e0e0;
+        --border-color: #404040;
+        --form-bg: #363636;
+        --button-bg: #4caf50;
+        --button-hover: #45a049;
+        --time-color: #b0b0b0;
+        --input-focus: #505050;
+      }
+
+      body {
+        font-family: "Segoe UI", Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        line-height: 1.6;
+      }
+
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 30px;
+        background-color: var(--container-bg);
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+      }
+
+      .message {
+        border: 1px solid var(--border-color);
+        padding: 20px;
+        margin: 15px 0;
+        border-radius: 8px;
+        background-color: var(--container-bg);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .message:hover {
+        transform: scale(1.01);
+        border-color: var(--button-bg);
+      }
+
+      .message-time {
+        color: var(--time-color);
+        font-size: 0.85em;
+        margin-top: 8px;
+        font-style: italic;
+      }
+
+      .empty {
+        color: var(--time-color);
+        font-style: italic;
+        text-align: center;
+        padding: 30px;
+        background-color: var(--form-bg);
+        border-radius: 8px;
+      }
+
+      .form-container {
+        margin-bottom: 30px;
+        padding: 25px;
+        background-color: var(--form-bg);
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .form-container form {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start; /* Align items to the top */
+      }
+
+      .form-container input[type="text"] {
+        flex: 1;
+        padding: 12px;
+        border: 2px solid var(--border-color);
+        border-radius: 8px;
+        background-color: var(--container-bg);
+        color: var(--text-color);
+        transition: all 0.3s ease;
+        min-width: 0; /* Prevent overflow in Firefox */
+      }
+
+      .form-container input[type="text"]:focus {
+        outline: none;
+        border-color: var(--button-bg);
+        background-color: var(--input-focus);
+        box-shadow: 0 0 5px rgba(76, 175, 80, 0.2);
+      }
+
+      .form-container button {
+        margin-top: 2px; /* Small top margin to align with input */
+        height: 42px; /* Fixed button height */
+        padding: 12px 24px;
+        background-color: var(--button-bg);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        white-space: nowrap; /* Prevent text wrapping */
+      }
+
+      .form-container button:hover:not(:disabled) {
+        background-color: var(--button-hover);
+        transform: translateY(-2px);
+      }
+
+      .form-container button:disabled {
+        background-color: #666;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .input-wrapper {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+
+      h1 {
+        color: var(--text-color);
+        margin-bottom: 30px;
+        text-align: center;
+        font-size: 2em;
+        letter-spacing: 1px;
+      }
+
+      .invalid-input {
+        border-color: #ff4444 !important;
+        background-color: rgba(255, 68, 68, 0.1) !important;
+      }
+
+      .input-hint {
+        color: var(--time-color);
+        font-size: 0.8em;
+        margin-top: 4px; /* Reduced margin for hint */
+        transition: color 0.3s ease;
+      }
+
+      .input-error {
+        color: #ff4444;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="form-container">
+        <form id="messageForm" onsubmit="return sendMessage(event)">
+          <div class="input-wrapper">
+            <input
+              type="text"
+              name="message"
+              id="messageInput"
+              placeholder='Enter JSON message (e.g., {"key": "value"})'
+              oninput="validateJSON(this)"
+            />
+            <div id="inputHint" class="input-hint">Please enter valid JSON</div>
+          </div>
+          <button type="submit" id="submitButton" disabled>Send</button>
+        </form>
+      </div>
+
+      {{if .KafkaMessages}} {{range .KafkaMessages}}
+      <div class="message">
+        <div>{{.Content}}</div>
+        <div class="message-time">
+          {{.Timestamp.Format "02.01.2006 15:04:05"}}
+        </div>
+      </div>
+      {{end}} {{else}}
+      <p class="empty">No messages</p>
+      {{end}}
+    </div>
+
+    <script>
+      function isValidJSON(str) {
+        try {
+          JSON.parse(str);
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      function validateJSON(input) {
+        const value = input.value.trim();
+        const button = document.getElementById("submitButton");
+        const hint = document.getElementById("inputHint");
+
+        if (value === "") {
+          button.disabled = true;
+          input.classList.remove("invalid-input");
+          hint.classList.remove("input-error");
+          hint.textContent = "Please enter valid JSON";
+          return;
+        }
+
+        if (!isValidJSON(value)) {
+          button.disabled = true;
+          input.classList.add("invalid-input");
+          hint.classList.add("input-error");
+          hint.textContent = "Invalid JSON format";
+          return;
+        }
+
+        input.classList.remove("invalid-input");
+        hint.classList.remove("input-error");
+        hint.textContent = "Valid JSON format";
+        button.disabled = false;
+      }
+
+      function validateForm() {
+        const input = document.getElementById("messageInput");
+        return input.value.trim() !== "" && isValidJSON(input.value.trim());
+      }
+
+      async function sendMessage(event) {
+        event.preventDefault();
+        const input = document.getElementById('messageInput');
+        const button = document.getElementById('submitButton');
+        const hint = document.getElementById('inputHint');
+
+        if (!validateForm()) {
+          return false;
+        }
+
+        button.disabled = true;
+        const message = input.value;
+
+        try {
+          const response = await fetch('/send', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `message=${encodeURIComponent(message)}`,
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            hint.textContent = errorText;
+            hint.classList.add('input-error');
+            throw new Error(errorText);
+          }
+
+          // Successful send
+          input.value = '';
+          hint.textContent = 'Message sent successfully';
+          hint.classList.remove('input-error');
+
+          // Update messages list only after successful send
+          window.location.reload();
+        } catch (error) {
+          console.error('Error:', error);
+          if (!hint.classList.contains('input-error')) {
+            hint.textContent = 'Connection error, please try again later';
+            hint.classList.add('input-error');
+          }
+        } finally {
+          button.disabled = false;
+        }
+
+        return false;
+      }
+    </script>
+  </body>
+</html>

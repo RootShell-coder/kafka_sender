@@ -1,0 +1,36 @@
+kafka:
+  # Basic settings
+  brokers:
+    - "localhost:9092"
+  topic: "web_requests"
+  num_workers: 3
+  batch_timeout: "100ms"
+  client_id: "web-service"
+
+  # SASL settings
+  use_sasl: true
+  username: ""  # empty for PLAIN without authentication
+  password: ""  # empty for PLAIN without authentication
+  algorithm: "PLAIN"  # available options: PLAIN, SCRAM-SHA-256, SCRAM-SHA-512
+
+  # SSL/TLS settings
+  use_ssl: false
+  cert_file: "cert/client.crt"
+  key_file: "cert/client.key"
+  ca_file: "cert/ca.crt"
+  verify_ssl: true
+
+# Logger settings
+logger:
+  level: "info"  # debug, info, warn, error
+  format: "text" # text or json
+  timestamp: true
+  colors: true
+
+# Server settings
+server:
+  host: "localhost"
+  port: 8080
+  read_timeout: "15s"
+  write_timeout: "15s"
+  idle_timeout: "60s"
