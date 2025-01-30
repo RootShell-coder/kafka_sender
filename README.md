@@ -32,12 +32,20 @@ kafka:
 
 ## Running the Application
 
-1. Start your Kafka broker
-2. Run the application:
+1. Install dependencies:
+   ```bash
+   go mod tidy
+   ```
+
+2. Start your Kafka broker
+
+3. Run the application:
+
    ```bash
    go run main.go
    ```
-3. Open http://localhost:8080 in your browser
+
+4. Open <http://localhost:8080> in your browser
 
 ## Usage Examples
 
@@ -45,9 +53,11 @@ kafka:
 
 1. Open the web interface
 2. Enter a valid JSON message in the input field:
+
    ```json
    {"user": "john", "action": "login", "timestamp": 1634567890}
    ```
+
 3. Click "Send" button
 
 ### Valid JSON Examples
@@ -73,6 +83,7 @@ kafka:
 ## Error Handling
 
 The application handles various error scenarios:
+
 - Invalid JSON format
 - Kafka connection issues
 - Network timeouts

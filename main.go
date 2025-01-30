@@ -6,9 +6,9 @@ import (
     "log"
     "net/http"
     "path/filepath"
-    "learning_go/one/kafka_handler"
-    "learning_go/one/logger"
-    "learning_go/one/config"
+    "one/kafka_handler"
+    "one/logger"
+    "one/config"
 )
 
 var (

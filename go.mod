@@ -1,4 +1,4 @@
-module learning_go/one
+module one
 
 go 1.20
 

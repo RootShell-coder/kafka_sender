@@ -9,8 +9,8 @@ import (
     "github.com/segmentio/kafka-go/sasl"
     "github.com/segmentio/kafka-go/sasl/plain"
     "github.com/segmentio/kafka-go/sasl/scram"
-    "learning_go/one/config"
-    "learning_go/one/goroutines"
+    "one/config"
+    "one/goroutines"
 )
 
 type Message struct {
