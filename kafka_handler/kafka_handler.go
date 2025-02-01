@@ -11,6 +11,7 @@ import (
     "github.com/segmentio/kafka-go/sasl/scram"
     "one/config"
     "one/goroutines"
+    "crypto/tls"
 )
 
 type Message struct {
@@ -26,37 +27,66 @@ type KafkaHandler struct {
 }
 
 func NewKafkaHandler(cfg *config.KafkaConfig) (*KafkaHandler, error) {
+    log.Printf("INFO: Initializing Kafka handler with brokers: %v, topic: %s", cfg.Brokers, cfg.Topic)
+    log.Printf("INFO: SASL config - enabled: %v, algorithm: %s, username: %s",
+        cfg.UseSASL, cfg.Algorithm, cfg.Username)
+
+    // Настраиваем TLS
+    tlsConfig := &tls.Config{
+        InsecureSkipVerify: true,  // Принудительно отключаем проверку сертификата
+    }
+
+    // Настраиваем SASL механизм
+    mechanism, err := getSASLMechanism(cfg)
+    if err != nil {
+        log.Printf("ERROR: Failed to create SASL mechanism: %v", err)
+        return nil, fmt.Errorf("SASL mechanism creation failed: %v", err)
+    }
+
     dialer := &kafka.Dialer{
-        Timeout:   10 * time.Second,
-        ClientID:  cfg.ClientID,
+        Timeout:       30 * time.Second,
+        DualStack:     true,
+        SASLMechanism: mechanism,
+        TLS:          tlsConfig,
     }
 
-    if cfg.UseSSL {
-        tlsConfig, err := cfg.GetTLSConfig()
+    // Тестовое подключение с подробным логированием
+    log.Printf("INFO: Testing connection to brokers...")
+    for _, broker := range cfg.Brokers {
+        ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+        log.Printf("INFO: Attempting to connect to broker: %s with SASL mechanism: %T",
+            broker, mechanism)
+
+        conn, err := dialer.DialContext(ctx, "tcp", broker)
         if err != nil {
-            return nil, err
+            cancel()
+            log.Printf("ERROR: Connection failed to %s: %v", broker, err)
+            continue
         }
-        dialer.TLS = tlsConfig
+
+        log.Printf("INFO: Successfully connected to broker: %s", broker)
+        conn.Close()
+        cancel()
     }
 
-    if cfg.UseSASL {
-        mechanism, err := getSASLMechanism(cfg)
-        if err != nil {
-            return nil, err
-        }
-        dialer.SASLMechanism = mechanism
-    }
-
+    // Настраиваем Writer
     writer := &kafka.Writer{
         Addr:         kafka.TCP(cfg.Brokers...),
         Topic:        cfg.Topic,
+        Balancer:     &kafka.LeastBytes{},
         BatchTimeout: cfg.BatchTimeout,
-        RequiredAcks: kafka.RequireOne,
-        Async:        false, // Change to synchronous mode
+        BatchSize:    1,
         Transport: &kafka.Transport{
-            SASL: dialer.SASLMechanism,
-            TLS:  dialer.TLS,
+            TLS:         tlsConfig,
+            SASL:        mechanism,
+            DialTimeout: 30 * time.Second,
         },
+        Logger: kafka.LoggerFunc(func(msg string, args ...interface{}) {
+            log.Printf("KAFKA: "+msg, args...)
+        }),
+        ErrorLogger: kafka.LoggerFunc(func(msg string, args ...interface{}) {
+            log.Printf("KAFKA ERROR: "+msg, args...)
+        }),
     }
 
     handler := &KafkaHandler{
@@ -66,48 +96,78 @@ func NewKafkaHandler(cfg *config.KafkaConfig) (*KafkaHandler, error) {
         messages:   make([]Message, 0),
     }
 
+    log.Printf("DEBUG: Kafka handler initialized successfully")
     return handler, nil
 }
 
 func getSASLMechanism(cfg *config.KafkaConfig) (sasl.Mechanism, error) {
+    log.Printf("DEBUG: Creating SASL mechanism: %s", cfg.Algorithm)
+
+    if (!cfg.UseSASL) {
+        log.Printf("INFO: SASL is disabled")
+        return nil, nil
+    }
+
     switch cfg.Algorithm {
     case "PLAIN":
-        // For PLAIN without authentication use empty values
+        log.Printf("DEBUG: Using PLAIN mechanism with username: %s", cfg.Username)
         return plain.Mechanism{
-            Username: "",  // empty login
-            Password: "",  // empty password
+            Username: cfg.Username,
+            Password: cfg.Password,
         }, nil
+    case "SCRAM-SHA-512":
+        log.Printf("DEBUG: Using SCRAM-SHA-512 mechanism with username: %s", cfg.Username)
+        return scram.Mechanism(scram.SHA512, cfg.Username, cfg.Password)
     case "SCRAM-SHA-256":
         return scram.Mechanism(scram.SHA256, cfg.Username, cfg.Password)
-    case "SCRAM-SHA-512":
-        return scram.Mechanism(scram.SHA512, cfg.Username, cfg.Password)
     default:
         return nil, fmt.Errorf("unsupported SASL mechanism: %s", cfg.Algorithm)
     }
 }
 
 func (h *KafkaHandler) SendMessage(msg string) error {
-    // Create channel for result
+    log.Printf("INFO: Attempting to send message to topic %s", h.config.Topic)
+    log.Printf("DEBUG: Starting to send message: %s", msg)
     resultChan := make(chan error, 1)
 
-    // Send task to pool
     h.workerPool.ExecuteAsync(func() error {
-        ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-        defer cancel()
+        var err error
+        for attempts := 0; attempts < 3; attempts++ {
+            log.Printf("DEBUG: Attempt %d to send message", attempts+1)
+            ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 
-        err := h.writer.WriteMessages(ctx,
-            kafka.Message{
-                Value: []byte(msg),
-                Time:  time.Now(),
-            },
-        )
+            start := time.Now()
+            err = h.writer.WriteMessages(ctx,
+                kafka.Message{
+                    Value: []byte(msg),
+                    Time:  time.Now(),
+                },
+            )
+            duration := time.Since(start)
+            log.Printf("DEBUG: Write attempt %d took %v", attempts+1, duration)
+
+            cancel()
+
+            if err == nil {
+                log.Printf("DEBUG: Message sent successfully on attempt %d", attempts+1)
+                break
+            }
+
+            log.Printf("DEBUG: Attempt %d failed: %v (error type: %T)", attempts+1, err, err)
+            if attempts < 2 {
+                delay := time.Second * time.Duration(attempts+1)
+                log.Printf("DEBUG: Waiting %v before next attempt", delay)
+                time.Sleep(delay)
+            }
+        }
         resultChan <- err
         return err
     })
 
     // Wait for result
     if err := <-resultChan; err != nil {
-        log.Printf("Error sending message to Kafka[%s]: %v", h.config.Topic, err)
+        log.Printf("ERROR: Failed to send message to Kafka[%s]: %v (error type: %T)",
+            h.config.Topic, err, err)
         return err
     }
 

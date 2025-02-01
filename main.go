@@ -9,6 +9,7 @@ import (
     "one/kafka_handler"
     "one/logger"
     "one/config"
+    "time"
 )
 
 var (
@@ -76,9 +77,23 @@ func main() {
     }
 
     cfg := config.NewDefaultConfig()
+    // Переопределяем конфигурацию из файла
+    if fileConfig, err := config.LoadConfig("config/config.yaml"); err == nil {
+        cfg = &fileConfig.Kafka
+        cfg.UseSASL = true     // Включаем SASL
+        cfg.UseSSL = true      // Включаем SSL/TLS
+        cfg.VerifySSL = false
+        // Увеличиваем таймауты
+        cfg.BatchTimeout = 1 * time.Second
+    } else {
+        log.Printf("Warning: Could not load config file, using defaults: %v", err)
+    }
+
+    log.Printf("Starting Kafka connection with brokers: %v", cfg.Brokers)
     kafkaHandler, err = kafka_handler.NewKafkaHandler(cfg)
     if err != nil {
-        log.Fatalf("Error initializing Kafka: %v", err)
+        log.Printf("Kafka connection details - Brokers: %v, Topic: %s", cfg.Brokers, cfg.Topic)
+        log.Fatalf("Failed to initialize Kafka handler: %v", err)
     }
     defer kafkaHandler.Close()
 
