@@ -26,12 +26,11 @@ func Middleware(next http.HandlerFunc) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         start := time.Now()
         clientIP := GetClientIP(r)
-        log.Printf("[%s] Входящий %s запрос: %s", clientIP, r.Method, r.URL.Path)
+        log.Printf("[%s] %s %s", clientIP, r.Method, r.URL.Path)
 
         next(w, r)
 
-        log.Printf("[%s] Завершён %s запрос: %s, время выполнения: %v",
-            clientIP, r.Method, r.URL.Path, time.Since(start))
+        log.Printf("[%s] %s completed in %v", clientIP, r.URL.Path, time.Since(start))
     }
 }
 

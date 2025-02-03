@@ -1,0 +1,64 @@
+# This is an example configuration file, mate. It sets up Kafka, logger, and server parameters for the application.
+kafka:
+  # List of Kafka brokers to connect to. Ensure these are reliable, guv'nor.
+  brokers:
+    - "localhost:9091"
+  # The Kafka topic from which messages will be produced and consumed.
+  topic: "topik"
+  # How long to wait for accumulating messages into a batch—a brisk "1s", innit.
+  batch_timeout: "1s"
+  # A unique identifier for the Kafka client; proper useful for tracking connections.
+  client_id: "kafka_client_id"
+  # Toggle SASL authentication. True means it'll use SASL for a bit of extra security, savvy?
+  use_sasl: true
+  # The SASL algorithm to employ—here, SCRAM-SHA-512 is used for robust authentication.
+  algorithm: "SCRAM-SHA-512"
+  # Username for SASL authentication. Keep it confidential, you hear?
+  username: "login"
+  # Password for SASL authentication. Guard it like you’d guard your cuppa tea.
+  password: "password"
+  # Enables SSL encryption for Kafka connections—always a smart move for secure comms.
+  use_ssl: true
+  # If set to false, SSL certificate verification is skipped. Use with caution, mate.
+  verify_ssl: false
+  # File path for the client certificate. Ensure it’s in the proper directory.
+  cert_file: "cert/сlient-cert.crt"
+  # File path for the client key. This and the above keep your keys safe and snug.
+  key_file: "cert/client.key"
+  # File path for the CA certificate. Essential when verifying SSL, even if we're skipping it.
+  ca_file: "cert/ca.crt"
+  # Number of worker routines to handle Kafka tasks—might need adjusting based on your load.
+  num_workers: 1
+  reader:
+    # The consumer group ID used when reading from Kafka. Proper group coordination, innit.
+    group_id: "consumer_group"
+    # Maximum wait time for a batch of messages in a single read; keeps things snapping along.
+    max_wait: "1s"
+    # The minimum number of bytes to try to fetch in a read request.
+    min_bytes: 1
+    # The maximum number of bytes to fetch in a single request—set for efficiency.
+    max_bytes: 10485760
+
+# Logging configuration settings.
+logger:
+  # The logging level—'info' means you'll see important messages without too much faff.
+  level: "info"
+  # Format to output logs in, here set to plain text.
+  format: "text"
+  # Include timestamps in logs so you can track when things happened, proper useful.
+  timestamp: true
+  # Toggle colourful logs. Gives a bit of flair when watching the console.
+  colors: true
+
+# Server configuration settings.
+server:
+  # The host address the server binds to; '0.0.0.0' means listen on all interfaces.
+  host: "0.0.0.0"
+  # The port on which the server listens for incoming requests.
+  port: 8080
+  # Maximum duration allowed to read the entire request—don't let things hang about too long.
+  read_timeout: "15s"
+  # Maximum duration allowed to write the response to the client—keep it snappy, mate.
+  write_timeout: "15s"
+  # The idle timeout for inactive connections—saves resources when the client is taking a breather.
+  idle_timeout: "60s"

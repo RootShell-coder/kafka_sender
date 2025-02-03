@@ -173,16 +173,18 @@
         </form>
       </div>
 
-      {{if .KafkaMessages}} {{range .KafkaMessages}}
-      <div class="message">
-        <div>{{.Content}}</div>
-        <div class="message-time">
-          {{.Timestamp.Format "02.01.2006 15:04:05"}}
+      <div id="messages">
+        {{if .KafkaMessages}} {{range .KafkaMessages}}
+        <div class="message">
+          <div>{{.Content}}</div>
+          <div class="message-time">
+            {{.Timestamp.Format "02.01.2006 15:04:05"}}
+          </div>
         </div>
+        {{end}} {{else}}
+        <p class="empty">No messages</p>
+        {{end}}
       </div>
-      {{end}} {{else}}
-      <p class="empty">No messages</p>
-      {{end}}
     </div>
 
     <script>
@@ -222,23 +224,15 @@
         button.disabled = false;
       }
 
-      function validateForm() {
-        const input = document.getElementById("messageInput");
-        return input.value.trim() !== "" && isValidJSON(input.value.trim());
-      }
-
       async function sendMessage(event) {
         event.preventDefault();
         const input = document.getElementById('messageInput');
         const button = document.getElementById('submitButton');
         const hint = document.getElementById('inputHint');
 
-        if (!validateForm()) {
-          return false;
-        }
+        if (input.value.trim() === "" || !isValidJSON(input.value.trim())) return false;
 
         button.disabled = true;
-        const message = input.value;
 
         try {
           const response = await fetch('/send', {
@@ -246,28 +240,23 @@
             headers: {
               'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: `message=${encodeURIComponent(message)}`,
+            body: `message=${encodeURIComponent(input.value)}`,
           });
 
           if (!response.ok) {
-            const errorText = await response.text();
-            hint.textContent = errorText;
+            hint.textContent = await response.text();
             hint.classList.add('input-error');
-            throw new Error(errorText);
+            throw new Error(hint.textContent);
           }
 
-          // Successful send
           input.value = '';
           hint.textContent = 'Message sent successfully';
           hint.classList.remove('input-error');
-
-          // Update messages list only after successful send
           window.location.reload();
         } catch (error) {
           console.error('Error:', error);
           if (!hint.classList.contains('input-error')) {
             hint.textContent = 'Connection error, please try again later';
-            hint.classList.add('input-error');
           }
         } finally {
           button.disabled = false;
@@ -275,6 +264,20 @@
 
         return false;
       }
+
+      const ws = new WebSocket('ws://' + window.location.host + '/ws');
+      const messagesContainer = document.getElementById('messages');
+
+      ws.onmessage = function(evt) {
+        const message = JSON.parse(evt.data);
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message';
+        messageDiv.innerHTML = `
+            <div>${message.Content}</div>
+            <div class="message-time">${message.Timestamp}</div>
+        `;
+        messagesContainer.insertBefore(messageDiv, messagesContainer.firstChild);
+      };
     </script>
   </body>
 </html>

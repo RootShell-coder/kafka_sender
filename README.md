@@ -2,6 +2,8 @@
 
 A web application that allows sending and viewing JSON messages through Apache Kafka.
 
+![alt text](docs/Screenshot_Kafka_Messages.png)
+
 ## Features
 
 - Send JSON messages to Kafka topic
@@ -23,7 +25,7 @@ The application can be configured via `config/config.yaml`:
 
 ```yaml
 kafka:
-  brokers: ["localhost:9092"]
+  brokers: ["localhost:9091"]
   topic: "web_requests"
   use_sasl: true
   algorithm: "PLAIN"
@@ -33,6 +35,7 @@ kafka:
 ## Running the Application
 
 1. Install dependencies:
+
    ```bash
    go mod tidy
    ```
@@ -94,3 +97,15 @@ The application handles various error scenarios:
 - SASL authentication support
 - SSL/TLS encryption support
 - Input validation to prevent invalid data
+
+## add user SCRAM-SHA-512
+
+```bash
+kafka-configs.sh \
+  --bootstrap-server kafka-0:9091 \
+  --command-config /client.properties \
+  --alter \
+  --add-config 'SCRAM-SHA-512=[iterations=8192,password=password]' \
+  --entity-type users \
+  --entity-name user
+```
